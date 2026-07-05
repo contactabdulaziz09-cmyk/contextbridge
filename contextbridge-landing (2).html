@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ContextBridge — Give Claude access to your actual business</title>
+<meta name="description" content="We wire Gmail, Notion, and your other tools into Claude so it actually knows your business. Done for you, in 48 hours.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0E1116;
+    --ink-soft: #1A1F28;
+    --paper: #F5F3EE;
+    --paper2: #ECE9E1;
+    --indigo: #3D5AFE;
+    --violet: #7C4DFF;
+    --amber: #FF8A3D;
+    --gray: #8B9099;
+    --gray-light: #B8BCC4;
+    --line: rgba(14,17,22,0.10);
+    --line-soft: rgba(245,243,238,0.14);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .display { font-family: 'Space Grotesk', sans-serif; }
+
+  a { color: inherit; text-decoration: none; }
+  img, svg { display: block; max-width: 100%; }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+
+  /* ===== NAV ===== */
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(245,243,238,0.88);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; padding: 16px 28px; max-width: 1080px; margin: 0 auto; }
+  .logo { display: flex; align-items: center; gap: 8px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+  .logo-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--violet); box-shadow: 0 0 0 3px rgba(124,77,255,0.18); }
+  .nav-links { display: flex; gap: 28px; font-size: 14px; font-weight: 500; color: var(--ink-soft); }
+  .nav-links a:hover { color: var(--violet); }
+  .nav-cta {
+    background: var(--ink); color: var(--paper);
+    padding: 9px 18px; border-radius: 7px; font-size: 14px; font-weight: 600;
+  }
+  .nav-cta:hover { background: var(--violet); }
+  @media (max-width: 700px) { .nav-links { display: none; } }
+
+  /* ===== HERO ===== */
+  .hero { padding: 76px 0 64px; position: relative; overflow: hidden; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500;
+    color: var(--violet); background: rgba(124,77,255,0.08);
+    border: 1px solid rgba(124,77,255,0.22);
+    padding: 6px 12px; border-radius: 100px; margin-bottom: 26px;
+  }
+  .eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
+  h1.display {
+    font-size: clamp(2.2rem, 5.2vw, 3.6rem);
+    font-weight: 700; letter-spacing: -0.025em; line-height: 1.06;
+    max-width: 760px; margin-bottom: 22px;
+  }
+  h1.display .accent { color: var(--violet); }
+  .hero-sub {
+    font-size: 1.15rem; color: var(--ink-soft); max-width: 560px; margin-bottom: 34px;
+    line-height: 1.55;
+  }
+  .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 64px; }
+  .btn-primary {
+    background: var(--violet); color: #fff;
+    padding: 14px 26px; border-radius: 8px; font-weight: 600; font-size: 15px;
+    display: inline-flex; align-items: center; gap: 8px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.05);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  .btn-primary:hover { background: #5B3FE0; transform: translateY(-1px); }
+  .btn-secondary {
+    border: 1.5px solid var(--line); color: var(--ink);
+    padding: 14px 26px; border-radius: 8px; font-weight: 600; font-size: 15px;
+    transition: border-color 0.15s ease;
+  }
+  .btn-secondary:hover { border-color: var(--ink); }
+
+  /* ===== WIRING DIAGRAM (signature element) ===== */
+  .diagram { position: relative; }
+  .diagram svg { width: 100%; height: auto; overflow: visible; }
+  .node-tool text { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; fill: var(--ink-soft); }
+  .node-claude text { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; fill: var(--paper); }
+  .wire { stroke: var(--gray-light); stroke-width: 1.5; fill: none; }
+  .wire-active { stroke: var(--violet); stroke-width: 2; fill: none; stroke-dasharray: 4 5; animation: dash 1.6s linear infinite; }
+  @keyframes dash { to { stroke-dashoffset: -36; } }
+  .pulse-dot { fill: var(--amber); opacity: 0; }
+  .label-before { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; fill: var(--gray); }
+  .label-after { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; fill: var(--violet); font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) {
+    .wire-active { animation: none; stroke-dasharray: none; }
+  }
+
+  /* ===== SECTION SHARED ===== */
+  section { padding: 78px 0; border-top: 1px solid var(--line); }
+  .section-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500;
+    color: var(--violet); text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 14px; display: block;
+  }
+  h2.display {
+    font-size: clamp(1.7rem, 3.4vw, 2.5rem); font-weight: 700;
+    letter-spacing: -0.02em; line-height: 1.15; max-width: 640px; margin-bottom: 16px;
+  }
+  .section-sub { color: var(--ink-soft); font-size: 1.02rem; max-width: 560px; margin-bottom: 48px; }
+
+  /* ===== PROBLEM ===== */
+  .pain-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .pain-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    padding: 22px 24px;
+  }
+  .pain-card .q { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--gray); margin-bottom: 10px; }
+  .pain-card p { font-size: 15px; color: var(--ink-soft); line-height: 1.55; }
+  .pain-card strong { color: var(--ink); }
+  @media (max-width: 700px) { .pain-row { grid-template-columns: 1fr; } }
+
+  /* ===== HOW IT WORKS ===== */
+  .steps { display: flex; flex-direction: column; gap: 0; }
+  .step {
+    display: grid; grid-template-columns: 64px 1fr; gap: 24px;
+    padding: 28px 0; border-bottom: 1px solid var(--line);
+  }
+  .step:last-child { border-bottom: none; }
+  .step-num {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px;
+    color: var(--gray-light);
+  }
+  .step.is-active .step-num { color: var(--violet); }
+  .step h3 { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+  .step p { color: var(--ink-soft); font-size: 14.5px; max-width: 520px; }
+  .step .time {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--amber);
+    margin-top: 8px; display: inline-block;
+  }
+
+  /* ===== TOOLS GRID ===== */
+  .tools-section { background: var(--ink); color: var(--paper); border-top: none; }
+  .tools-section .section-label { color: var(--amber); }
+  .tools-section h2.display { color: var(--paper); }
+  .tools-section .section-sub { color: var(--gray-light); }
+  .tool-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tool-chip {
+    background: var(--ink-soft); border: 1px solid var(--line-soft);
+    border-radius: 8px; padding: 16px 14px; font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; color: var(--gray-light); text-align: center;
+  }
+  .tool-chip.live { color: var(--paper); border-color: rgba(124,77,255,0.4); background: rgba(124,77,255,0.10); }
+  .tool-chip .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 6px; background: var(--gray); }
+  .tool-chip.live .dot { background: #4ADE80; }
+  @media (max-width: 700px) { .tool-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  /* ===== PRICING ===== */
+  .price-card {
+    max-width: 460px; background: #fff; border: 1.5px solid var(--ink);
+    border-radius: 14px; padding: 36px 34px; position: relative;
+  }
+  .price-card::before {
+    content: 'FOUNDING RATE'; position: absolute; top: -11px; left: 32px;
+    background: var(--amber); color: var(--ink); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px; letter-spacing: 0.04em;
+  }
+  .price-amount { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 6px; }
+  .price-amount .num { font-family: 'Space Grotesk', sans-serif; font-size: 3rem; font-weight: 700; letter-spacing: -0.02em; }
+  .price-amount .was { font-family: 'JetBrains Mono', monospace; font-size: 16px; color: var(--gray); text-decoration: line-through; }
+  .price-note { color: var(--gray); font-size: 13.5px; margin-bottom: 26px; }
+  .price-list { list-style: none; margin-bottom: 30px; }
+  .price-list li { display: flex; gap: 10px; padding: 9px 0; font-size: 14.5px; color: var(--ink-soft); border-bottom: 1px solid var(--paper2); }
+  .price-list li:last-child { border-bottom: none; }
+  .price-list .check { color: var(--violet); font-weight: 700; flex-shrink: 0; }
+  .btn-block { display: block; text-align: center; width: 100%; }
+
+  /* ===== FAQ ===== */
+  .faq-item { border-bottom: 1px solid var(--line); padding: 22px 0; }
+  .faq-item h3 { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .faq-item p { color: var(--ink-soft); font-size: 14.5px; max-width: 600px; }
+
+  /* ===== FINAL CTA ===== */
+  .final-cta { text-align: center; padding: 90px 0; }
+  .final-cta h2.display { margin: 0 auto 18px; }
+  .final-cta .section-sub { margin: 0 auto 36px; }
+  .final-cta .hero-actions { justify-content: center; margin-bottom: 0; }
+
+  footer {
+    border-top: 1px solid var(--line); padding: 28px 0; text-align: center;
+    color: var(--gray); font-size: 13px; font-family: 'JetBrains Mono', monospace;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="logo"><span class="logo-dot"></span>ContextBridge</div>
+    <div class="nav-links">
+      <a href="#problem">The problem</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a href="#pricing" class="nav-cta">Book setup</a>
+  </div>
+</nav>
+
+<section class="hero wrap" style="border-top:none;">
+  <span class="eyebrow">Done for you · 48-hour turnaround</span>
+  <h1 class="display">Claude doesn't know your inbox.<br>We <span class="accent">wire it up</span> so it does.</h1>
+  <p class="hero-sub">We connect Gmail, Notion, and the rest of your stack to Claude using MCP — so it can read your real emails, your real notes, and actually help, instead of guessing. No code. No subscriptions. One setup, then it's yours.</p>
+  <div class="hero-actions">
+    <a href="#pricing" class="btn-primary">Get connected — $299 →</a>
+    <a href="#how" class="btn-secondary">See how it works</a>
+  </div>
+
+  <div class="diagram">
+    <svg viewBox="0 0 1024 320" xmlns="http://www.w3.org/2000/svg" aria-label="Diagram showing Gmail and Notion disconnected on the left, then wired through MCP into Claude on the right">
+      <!-- LEFT: before -->
+      <text x="40" y="34" class="label-before">BEFORE</text>
+      <g class="node-tool">
+        <rect x="30" y="56" width="150" height="46" rx="8" fill="#fff" stroke="#D8D5CC" stroke-width="1.5"/>
+        <text x="55" y="84">gmail.com</text>
+        <circle cx="40" cy="79" r="3" fill="#D8D5CC"/>
+      </g>
+      <g class="node-tool">
+        <rect x="30" y="118" width="150" height="46" rx="8" fill="#fff" stroke="#D8D5CC" stroke-width="1.5"/>
+        <text x="55" y="146">notion.so</text>
+        <circle cx="40" cy="141" r="3" fill="#D8D5CC"/>
+      </g>
+      <g class="node-tool">
+        <rect x="30" y="180" width="150" height="46" rx="8" fill="#fff" stroke="#D8D5CC" stroke-width="1.5"/>
+        <text x="55" y="208">claude.ai</text>
+        <circle cx="40" cy="203" r="3" fill="#D8D5CC"/>
+      </g>
+      <text x="30" y="252" class="label-before">"explain your business again. and again."</text>
+
+      <!-- divider -->
+      <line x1="280" y1="20" x2="280" y2="290" stroke="#D8D5CC" stroke-width="1" stroke-dasharray="2 5"/>
+
+      <!-- RIGHT: after -->
+      <text x="330" y="34" class="label-after">AFTER</text>
+
+      <g class="node-tool">
+        <rect x="330" y="56" width="150" height="46" rx="8" fill="#fff" stroke="#3D5AFE" stroke-width="1.5"/>
+        <text x="355" y="84">gmail.com</text>
+        <circle cx="340" cy="79" r="3" fill="#3D5AFE"/>
+      </g>
+      <g class="node-tool">
+        <rect x="330" y="118" width="150" height="46" rx="8" fill="#fff" stroke="#3D5AFE" stroke-width="1.5"/>
+        <text x="355" y="146">notion.so</text>
+        <circle cx="340" cy="141" r="3" fill="#3D5AFE"/>
+      </g>
+      <g class="node-tool">
+        <rect x="330" y="180" width="150" height="46" rx="8" fill="#fff" stroke="#3D5AFE" stroke-width="1.5"/>
+        <text x="355" y="208">+ more</text>
+        <circle cx="340" cy="203" r="3" fill="#3D5AFE"/>
+      </g>
+
+      <!-- wires into MCP node -->
+      <path class="wire-active" d="M480,79 C 560,79 560,160 620,160"/>
+      <path class="wire-active" d="M480,141 C 560,141 560,160 620,160"/>
+      <path class="wire-active" d="M480,203 C 560,203 560,160 620,160"/>
+
+      <!-- MCP node -->
+      <circle cx="650" cy="160" r="34" fill="#fff" stroke="#7C4DFF" stroke-width="2"/>
+      <text x="650" y="156" text-anchor="middle" class="mono" font-size="10.5" fill="#7C4DFF" font-weight="600">MCP</text>
+      <text x="650" y="170" text-anchor="middle" class="mono" font-size="9" fill="#8B9099">bridge</text>
+
+      <!-- wire into Claude -->
+      <path class="wire-active" d="M684,160 C 740,160 740,160 790,160"/>
+
+      <!-- Claude node -->
+      <g class="node-claude">
+        <rect x="790" y="115" width="180" height="90" rx="12" fill="#0E1116"/>
+        <text x="880" y="155" text-anchor="middle">Claude</text>
+        <text x="880" y="178" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="400" font-size="11" fill="#B8BCC4">now it just knows</text>
+      </g>
+
+      <!-- pulse dots animated via SMIL for portability -->
+      <circle class="pulse-dot" cx="480" cy="79" r="4">
+        <animate attributeName="opacity" values="0;1;0" dur="1.6s" begin="0s" repeatCount="indefinite"/>
+        <animateMotion path="M0,0 C 80,0 80,81 140,81" dur="1.6s" begin="0s" repeatCount="indefinite"/>
+      </circle>
+      <circle class="pulse-dot" cx="480" cy="141" r="4">
+        <animate attributeName="opacity" values="0;1;0" dur="1.6s" begin="0.3s" repeatCount="indefinite"/>
+        <animateMotion path="M0,0 C 80,0 80,19 140,19" dur="1.6s" begin="0.3s" repeatCount="indefinite"/>
+      </circle>
+      <circle class="pulse-dot" cx="480" cy="203" r="4">
+        <animate attributeName="opacity" values="0;1;0" dur="1.6s" begin="0.6s" repeatCount="indefinite"/>
+        <animateMotion path="M0,0 C 80,0 80,-43 140,-43" dur="1.6s" begin="0.6s" repeatCount="indefinite"/>
+      </circle>
+    </svg>
+  </div>
+</section>
+
+<section id="problem" class="wrap">
+  <span class="section-label">// the problem</span>
+  <h2 class="display">You already pay for AI. It still can't help with the stuff that matters.</h2>
+  <p class="section-sub">Claude is smart. But by default it knows nothing about your actual business — your real client emails, your real project notes, your real to-dos. Every conversation starts from zero.</p>
+
+  <div class="pain-row">
+    <div class="pain-card">
+      <div class="q">$ you, every morning</div>
+      <p><strong>"Let me paste in the email thread"</strong> — copying context from Gmail into a chat window, every single time you want help with a reply.</p>
+    </div>
+    <div class="pain-card">
+      <div class="q">$ you, every project</div>
+      <p><strong>"Here's what's in my Notion doc"</strong> — re-explaining your own plans because Claude can't just look them up.</p>
+    </div>
+    <div class="pain-card">
+      <div class="q">$ you, trying MCP yourself</div>
+      <p><strong>"This setup guide assumes I'm a developer"</strong> — official docs require API keys, terminal commands, and config files most founders never touch.</p>
+    </div>
+    <div class="pain-card">
+      <div class="q">$ you, after giving up</div>
+      <p><strong>"I'll just keep copy-pasting"</strong> — back to manual context-switching, because the setup cost more time than it saved.</p>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="wrap">
+  <span class="section-label">// how it works</span>
+  <h2 class="display">You don't touch a config file. We do the wiring.</h2>
+  <p class="section-sub">A real person sets this up for you — not a generic install script. You answer a few questions, we handle every technical step, and you get a working setup with a short video walking through exactly what we did.</p>
+
+  <div class="steps">
+    <div class="step is-active">
+      <div class="step-num">01</div>
+      <div>
+        <h3>15-minute intake call (or async form)</h3>
+        <p>Tell us which tools run your business and what you wish Claude already knew. No technical knowledge needed on your end.</p>
+        <span class="time">~15 min, your time</span>
+      </div>
+    </div>
+    <div class="step is-active">
+      <div class="step-num">02</div>
+      <div>
+        <h3>We build your connections</h3>
+        <p>We configure secure MCP connections between Claude and your tools — Gmail, Notion, and others — using scoped, revocable access. You stay in control of every permission.</p>
+        <span class="time">~24–48 hrs, our time</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div>
+        <h3>Walkthrough + handoff</h3>
+        <p>We record a 10-minute screen-share showing your new setup in action, plus a one-page guide for adding or removing tools later.</p>
+        <span class="time">~10 min video, yours to keep</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <div>
+        <h3>2 weeks of free fixes</h3>
+        <p>If anything breaks or a permission needs adjusting, we fix it free for 14 days after delivery. No retainer required.</p>
+        <span class="time">14-day window</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="tools-section">
+  <div class="wrap">
+    <span class="section-label">// works with</span>
+    <h2 class="display">Start with two. Add more later.</h2>
+    <p class="section-sub">Gmail and Notion cover most solo founders and freelancers on day one. As you grow, we wire in the rest — one flat fee per tool added.</p>
+    <div class="tool-grid">
+      <div class="tool-chip live"><span class="dot"></span>gmail.com</div>
+      <div class="tool-chip live"><span class="dot"></span>notion.so</div>
+      <div class="tool-chip"><span class="dot"></span>hubspot.com</div>
+      <div class="tool-chip"><span class="dot"></span>shopify.com</div>
+      <div class="tool-chip"><span class="dot"></span>calendly.com</div>
+      <div class="tool-chip"><span class="dot"></span>slack.com</div>
+      <div class="tool-chip"><span class="dot"></span>airtable.com</div>
+      <div class="tool-chip"><span class="dot"></span>+ your tool</div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing" class="wrap">
+  <span class="section-label">// pricing</span>
+  <h2 class="display">One flat fee. Nothing recurring.</h2>
+  <p class="section-sub">We're taking on 5 founding clients this month to refine the process. After that, the price goes up — but yours won't.</p>
+
+  <div class="price-card">
+    <div class="price-amount">
+      <span class="num mono">$299</span>
+      <span class="was mono">$499</span>
+    </div>
+    <p class="price-note">One-time payment · USDT or bank transfer · delivered in 48 hours</p>
+    <ul class="price-list">
+      <li><span class="check">✓</span> Gmail + Notion connected to Claude via MCP</li>
+      <li><span class="check">✓</span> Secure, scoped, revocable permissions — you stay in control</li>
+      <li><span class="check">✓</span> 10-minute personal walkthrough video</li>
+      <li><span class="check">✓</span> One-page guide for managing it yourself afterward</li>
+      <li><span class="check">✓</span> 14 days of free fixes if anything breaks</li>
+      <li><span class="check">✓</span> Add extra tools later for $79 each</li>
+    </ul>
+    <a href="mailto:contactabdulaziz09@gmail.com?subject=I want to get set up" class="btn-primary btn-block">Book your setup — $299 →</a>
+    <p style="text-align:center; margin-top:14px; font-size:13px; font-family:'JetBrains Mono',monospace; color:var(--gray);">or email directly: <a href="mailto:contactabdulaziz09@gmail.com" style="color:var(--violet); text-decoration:underline;">contactabdulaziz09@gmail.com</a></p>
+  </div>
+</section>
+
+<section id="faq" class="wrap">
+  <span class="section-label">// faq</span>
+  <h2 class="display">Before you ask.</h2>
+
+  <div class="faq-item">
+    <h3>Is this safe? Are you reading my emails?</h3>
+    <p>No. We set up the connection — we don't sit in the middle of it. Permissions are scoped and revocable from your own Google/Notion account settings at any time. We never store your data on our side.</p>
+  </div>
+  <div class="faq-item">
+    <h3>Do I need a paid Claude plan?</h3>
+    <p>You need a Claude account with MCP/connector support, which is available on free and paid tiers depending on Anthropic's current plans. We'll confirm exactly what you need during intake before any work starts.</p>
+  </div>
+  <div class="faq-item">
+    <h3>What if it breaks after setup?</h3>
+    <p>You get 14 days of free fixes. After that, small fixes are a flat $40; if you want ongoing support, we offer an optional $19/month maintenance plan — no pressure either way.</p>
+  </div>
+  <div class="faq-item">
+    <h3>Can you connect tools other than Gmail and Notion?</h3>
+    <p>Yes — HubSpot, Shopify, Slack, Calendly, and most tools with public APIs. Mention what you use during intake and we'll confirm feasibility before you pay anything.</p>
+  </div>
+  <div class="faq-item">
+    <h3>I'm not techy at all. Will I understand any of this?</h3>
+    <p>That's who this is for. You never touch a terminal or a config file. The walkthrough video is built for someone seeing this for the first time.</p>
+  </div>
+  <div class="faq-item">
+    <h3>How do I pay?</h3>
+    <p>We accept USDT (crypto via any wallet) and direct bank transfer. After you reach out we'll confirm the details before any work starts. No payment is taken until you've had a chance to ask questions and confirm you're happy to proceed.</p>
+  </div>
+</section>
+
+<section class="final-cta wrap" style="border-top: 1px solid var(--line);">
+  <span class="section-label">// ready?</span>
+  <h2 class="display">Stop re-explaining your business to your AI.</h2>
+  <p class="section-sub">Founding rate ends after 5 clients. Setup starts within 48 hours of payment.</p>
+  <div class="hero-actions">
+    <a href="mailto:contactabdulaziz09@gmail.com?subject=I want to get set up" class="btn-primary">Get connected — $299 →</a>
+  </div>
+  <p style="margin-top:16px; font-size:13px; font-family:'JetBrains Mono',monospace; color:var(--gray);">or email: <a href="mailto:contactabdulaziz09@gmail.com" style="color:var(--violet); text-decoration:underline;">contactabdulaziz09@gmail.com</a></p>
+</section>
+
+<footer>
+  ContextBridge · contactabdulaziz09@gmail.com · Built with Claude, run by one person.
+</footer>
+
+</body>
+</html>
